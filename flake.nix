@@ -1,4 +1,3 @@
-
 {
   description = "Darkmatter Nix Flake Template";
 
@@ -9,7 +8,9 @@
     prelude.url = "github:darkmatter/prelude";
   };
 
-  outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } (
+  outputs =
+    inputs:
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } (
       top@{
         config,
         withSystem,
@@ -19,7 +20,8 @@
       {
         imports = [
           inputs.prelude.flakeModules.default
-          ./prelude.nix
+          ./nix/prelude.nix
+          ./nix/dev-tls.nix
           inputs.treefmt-nix.flakeModule
         ];
         systems = [
@@ -30,37 +32,46 @@
 
         perSystem = { config, pkgs, ... }: {
 
-            treefmt.config = {
-              projectRootFile = "flake.nix";
-              programs = {
-                prettier.enable = true;
-                rustfmt.enable = true;
-                nixfmt.enable = true;
-                taplo.enable = true;
-              };
-              # Generated output is committed as its generator emits it; see
-              # .prettierignore for why formatting it breaks `db:codegen --verify`.
-              settings.global.excludes = [
-                "result/*"
-              ];
-            };
-
-            devShells.default = pkgs.mkShell {
-              name = "myapp-devshell";
-              buildInputs = [];
-              packages = with pkgs; [
-                git
-                jq
-                sops
-                age
-                config.packages.prelude
-              ];
-
-              shellHook = ''
-                motd
-              '';
-            };
+          # Dev TLS shared through SOPS. Set the hostname your dev server is
+          # reached by; see nix/dev-tls.nix for why the key is not committed.
+          devTls = {
+            enable = true;
+            hostname = "app.lan";
           };
+
+          treefmt.config = {
+            projectRootFile = "flake.nix";
+            programs = {
+              prettier.enable = true;
+              rustfmt.enable = true;
+              nixfmt.enable = true;
+              taplo.enable = true;
+            };
+            # Build outputs are not ours to format.
+            settings.global.excludes = [
+              "result/*"
+            ];
+          };
+
+          devShells.default = pkgs.mkShell {
+            name = "myapp-devshell";
+            buildInputs = [ ];
+            packages = with pkgs; [
+              git
+              jq
+              sops
+              age
+              step-cli
+              config.packages.prelude
+              config.packages.dev-tls
+              config.packages.sops-init
+            ];
+
+            shellHook = ''
+              motd
+            '';
+          };
+        };
       }
     );
 
